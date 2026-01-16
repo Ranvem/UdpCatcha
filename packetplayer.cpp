@@ -20,7 +20,7 @@ PlaybackThread::PlaybackThread(const QString& filename, const QString& interface
 {
 }
 
-void PlaybackThread::run()
+void PlaybackThread::run()  
 {
     pcpp::PcapFileReaderDevice reader(filename.toStdString());
     
@@ -67,32 +67,50 @@ void PlaybackThread::run()
         if (!firstPacket)
         {
             if (useTimestamps)
-            {
-                qDebug()<<"Using timestamps for delay calculation";
-                qDebug() << "Current Timestamp: " << currTimestamp.tv_sec << "s       " << currTimestamp.tv_nsec << "ns";
-                // Вычисляем разницу во времени между пакетами
-                double deltaSeconds = currTimestamp.tv_sec - prevTimestamp.tv_sec;
-                double deltaNanos = currTimestamp.tv_nsec - prevTimestamp.tv_nsec;
-                double totalDelay = deltaSeconds + (deltaNanos / 1e9);
-                qDebug() << "curr:" << currTimestamp.tv_sec << "prev" << prevTimestamp.tv_sec;
-                qDebug() << "curr:" << currTimestamp.tv_nsec << "prev" << prevTimestamp.tv_nsec;
-                qDebug() << "" << deltaSeconds << "     " << deltaNanos;
-                qDebug() << "Delaying for" << totalDelay << "seconds";
-                // Преобразуем секунды в миллисекунды
-                double delayMs = totalDelay * 1000;
-                qDebug() << "Delaying for" << delayMs << "milliseconds";
-                
-                if (delayMs > 0)
-                {
-                    msleep(delayMs);
-                }
+    {
+        qDebug() << "Using timestamps for delay calculation";
+        qDebug() << "Current Timestamp: " << currTimestamp.tv_sec << "s " << currTimestamp.tv_nsec << "ns";
+        
+        // Вычисляем разницу во времени корректно
+        long deltaSeconds = currTimestamp.tv_sec - prevTimestamp.tv_sec;
+        long deltaNanos = currTimestamp.tv_nsec - prevTimestamp.tv_nsec;
+        
+        // Корректируем, если наносекунды отрицательные
+        if (deltaNanos < 0) {
+            deltaSeconds--;
+            deltaNanos += 1000000000L;
+        }
+        
+        double totalDelay = deltaSeconds + (deltaNanos / 1e9);
+        
+        qDebug() << "Delaying for" << totalDelay << "seconds";
+        
+        if (totalDelay > 0) {
+            // Используем микросекунды для точности
+            long long delayUs = static_cast<long long>(totalDelay * 1000000); // микросекунды
+            
+            // Разделяем задержку на миллисекунды и микросекунды
+            unsigned int ms = static_cast<unsigned int>(delayUs / 1000);
+            unsigned int us = static_cast<unsigned int>(delayUs % 1000);
+            
+            qDebug() << "Delaying for" << delayUs << "microseconds (" 
+                     << ms << "ms + " << us << "us)";
+            
+            if (ms > 0) {
+                QThread::msleep(ms);
             }
-            else if (interval >= 0)
-            {
-                qDebug() << "Delaying for" << interval << "m/seconds";
-                msleep(interval);
-                 
+            if (us > 0) {
+                QThread::usleep(us); // микросекунды
             }
+        } else {
+            qDebug() << "No delay needed or negative delay";
+        }
+    }
+    else if (interval >= 0)
+    {
+        qDebug() << "Delaying for" << interval << "milliseconds";
+        QThread::msleep(interval);
+    }
         }
         
         // Отправляем пакет

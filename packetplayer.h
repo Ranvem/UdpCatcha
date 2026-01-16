@@ -1,45 +1,43 @@
 #ifndef PACKETPLAYER_H
 #define PACKETPLAYER_H
 
-#include <QWidget>
-#include <QTableWidget>
-#include <QTextEdit>
-#include <QPushButton>
-#include <QLineEdit>
-#include <QSpinBox>
-#include <QLabel>
-#include <QComboBox>
 #include <QThread>
-
-#include "pcapplusplus/PcapFileDevice.h"
-#include "pcapplusplus/PcapLiveDevice.h"
-#include "pcapplusplus/PcapLiveDeviceList.h"  
-#include "pcapplusplus/UdpLayer.h"            
-#include "pcapplusplus/Packet.h"              
-
-#include <chrono>
+#include <QWidget>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QSpinBox>
+#include <QPushButton>
+#include <QTextEdit>
+#include <QLabel>
+#include <QCheckBox>
+#include <pcapplusplus/PcapLiveDeviceList.h>
+#include <pcapplusplus/PcapFileDevice.h>
 
 class PlaybackThread : public QThread
 {
     Q_OBJECT
-    
+
 public:
-    PlaybackThread(const QString& filename, const QString& interface, 
-                   int interval, QObject* parent = nullptr);
-    
+    PlaybackThread(const QString& filename, 
+                   const QString& interface, 
+                   bool useTimestamps, 
+                   int interval, 
+                   QObject* parent = nullptr);
+
 signals:
     void playbackStatus(const QString& status);
     void playbackError(const QString& error);
     void packetSent(const QString& packetInfo);
     void playbackFinished();
-    
+
 protected:
     void run() override;
-    
+
 private:
     QString filename;
     QString interface;
     int interval;
+    bool useTimestamps;
 };
 
 class PacketPlayer : public QWidget
@@ -62,20 +60,20 @@ private slots:
 private:
     void setupUI();
     void populateInterfaces();
-    
-    // UI Elements
-    QLineEdit *fileEdit;
-    QPushButton *browseButton;
-    QComboBox *interfaceCombo;
-    QSpinBox *intervalSpin;
-    QPushButton *playButton;
-    QPushButton *stopButton;
-    QTextEdit *logText;
-    QLabel *statusLabel;
-    
-    // Playback data
+
     PlaybackThread* playbackThread;
     bool isPlaying;
+
+    // UI элементы
+    QLineEdit* fileEdit;
+    QComboBox* interfaceCombo;
+    QSpinBox* intervalSpin;
+    QCheckBox* useTimestampCheck;
+    QPushButton* browseButton;
+    QPushButton* playButton;
+    QPushButton* stopButton;
+    QTextEdit* logText;
+    QLabel* statusLabel;
 };
 
 #endif // PACKETPLAYER_H

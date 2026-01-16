@@ -5,12 +5,13 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDateTime>
-
+#include <QDebug>
 #include <sys/time.h>
+#include <pcapplusplus/Packet.h>
+#include <pcapplusplus/UdpLayer.h>
 
-PlaybackThread::PlaybackThread(const QString& filename, const QString& interface, 
-                               int interval, QObject* parent)
-    : QThread(parent), filename(filename), interface(interface), interval(interval)
+PlaybackThread::PlaybackThread(const QString& filename, const QString& interface, bool useTimestamps, int interval, QObject* parent)
+    : QThread(parent), filename(filename), interface(interface), useTimestamps(useTimestamps), interval(interval)
 {
 }
 
@@ -47,9 +48,18 @@ void PlaybackThread::run()
     
     pcpp::RawPacket rawPacket;
     int packetCount = 0;
-    
+    timespec prevTimestamp = {0, 0};
+    bool firstPacket = true;
+    double totalDelay = 0.0;
     while (reader.getNextPacket(rawPacket))
     {
+        timespec currTimestamp = rawPacket.getPacketTimeStamp();
+        if(!firstPacket){
+            double deltaSeconds = currTimestamp.tv_sec - prevTimestamp.tv_sec;
+            double deltaNanos = currTimestamp.tv_nsec - prevTimestamp.tv_nsec;
+
+            totalDelay = deltaSeconds+(deltaNanos / 1e9);
+        }
         if (isInterruptionRequested())
             break;
         
@@ -77,9 +87,15 @@ void PlaybackThread::run()
             }
             
             emit packetSent(packetInfo);
-            
-            if (interval > 0)
+            if(useTimestamps){
+                qDebug() << "Guga";
+                msleep(totalDelay);
+            }
+            else if (interval > 0)
+                qDebug() << "Lala";
                 msleep(interval);
+            prevTimestamp = currTimestamp;
+            firstPacket = false;
         }
         else
         {
@@ -134,6 +150,9 @@ void PacketPlayer::setupUI()
     intervalSpin->setRange(0, 10000);
     intervalSpin->setValue(0);
     intervalSpin->setSuffix(" ms");
+
+    useTimestampCheck = new QCheckBox("Use Timestamps", this);
+    useTimestampCheck->setChecked(false);
     
     playButton = new QPushButton("Start Playback", this);
     stopButton = new QPushButton("Stop Playback", this);
@@ -145,6 +164,7 @@ void PacketPlayer::setupUI()
     buttonLayout->addStretch();
     
     controlLayout->addRow(interfaceLabel, interfaceCombo);
+    controlLayout->addRow(useTimestampCheck);
     controlLayout->addRow(intervalLabel, intervalSpin);
     controlLayout->addRow("", buttonLayout);
     
@@ -208,14 +228,13 @@ void PacketPlayer::startPlayback()
         return;
     }
     
-    // Clear log
     logText->clear();
     
-    // Start playback thread
     playbackThread = new PlaybackThread(fileEdit->text(), 
-                                        interfaceCombo->currentData().toString(),
-                                        intervalSpin->value(), 
-                                        this);
+                                    interfaceCombo->currentData().toString(),
+                                    useTimestampCheck->isChecked(),
+                                    intervalSpin->value(),
+                                    this);
     
     connect(playbackThread, &PlaybackThread::playbackStatus,
             this, &PacketPlayer::onPlaybackStatus);

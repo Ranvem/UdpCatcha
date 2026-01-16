@@ -8,12 +8,10 @@
 #include <QDateTime>
 #include <QTextStream>
 #include <arpa/inet.h>
-#include <sys/time.h>  // Для timeval
-#include <QMetaType>  // ДОБАВИТЬ
+#include <sys/time.h>  
+#include <QMetaType>  
 
-// Регистрация std::vector<uint8_t> для использования в сигналах Qt
 Q_DECLARE_METATYPE(std::vector<uint8_t>)
-// Функция для преобразования chrono::time_point в timeval
 static timeval chronoToTimeval(const std::chrono::system_clock::time_point& tp)
 {
     auto duration = tp.time_since_epoch();
@@ -27,10 +25,9 @@ static timeval chronoToTimeval(const std::chrono::system_clock::time_point& tp)
 }
 
 CaptureThread::CaptureThread(pcpp::PcapLiveDevice* dev, const std::string& filter, 
-                             std::atomic<bool>& stopFlag, QObject* parent)
-    : QThread(parent), device(dev), filter(filter), stopFlag(stopFlag)
+                             std::atomic<bool>& stopFlag, bool isProm ,QObject* parent)
+    : QThread(parent), device(dev), filter(filter), stopFlag(stopFlag), isPromiscuous(isProm)
 {
-    // Регистрируем тип при создании потока
     qRegisterMetaType<std::vector<uint8_t>>();
     qRegisterMetaType<std::vector<uint8_t>>("std::vector<uint8_t>");
 }
@@ -39,10 +36,11 @@ CaptureThread::CaptureThread(pcpp::PcapLiveDevice* dev, const std::string& filte
 
 void CaptureThread::run()
 {
-    // ФИКС: Используем правильное именование констант
     pcpp::PcapLiveDevice::DeviceConfiguration config;
-    config.mode = pcpp::PcapLiveDevice::Promiscuous;
-    
+    if(isPromiscuous)
+        config.mode = pcpp::PcapLiveDevice::Promiscuous;
+    else
+        config.mode = pcpp::PcapLiveDevice::Normal;
     if (!device->open(config))
     {
         emit captureError("Cannot open device for capture");
@@ -333,7 +331,6 @@ void PacketCapture::startCapture()
         return;
     
     QString interfaceName = interfaceCombo->currentData().toString();
-    // ФИКС: Используем getDeviceByName вместо getPcapLiveDeviceByName
     selectedDevice = pcpp::PcapLiveDeviceList::getInstance().getDeviceByName(interfaceName.toStdString());
     
     if (!selectedDevice)
@@ -342,16 +339,14 @@ void PacketCapture::startCapture()
         return;
     }
     
-    // Clear previous data
     packetTable->setRowCount(0);
     capturedPackets.clear();
     packetCounter = 0;
     detailText->clear();
     
-    // Start capture thread
     stopCaptureFlag = false;
     captureThread = new CaptureThread(selectedDevice, filterEdit->text().toStdString(), 
-                                      stopCaptureFlag, this);
+                                      stopCaptureFlag, promiscuousCheck->isChecked(), this);
     
     connect(captureThread, &CaptureThread::packetCaptured, 
             this, &PacketCapture::onPacketCaptured);
@@ -397,7 +392,6 @@ void PacketCapture::saveToFile()
     if (fileName.isEmpty())
         return;
     
-    // Write packets to file
     pcpp::PcapFileWriterDevice writer(fileName.toStdString());
     
     if (!writer.open())
@@ -428,15 +422,12 @@ void PacketCapture::onPacketCaptured(const QString& summary, const QString& deta
     packetCounter++;
     capturedPackets.push_back(rawData);
     
-    // Add to table
     int row = packetTable->rowCount();
     packetTable->insertRow(row);
     
     packetTable->setItem(row, 0, new QTableWidgetItem(QString::number(packetCounter)));
     packetTable->setItem(row, 1, new QTableWidgetItem(QTime::currentTime().toString("hh:mm:ss.zzz")));
-    
-    // Parse packet for table details
-    // ФИКС: Используем timeval вместо chrono::time_point
+
     timeval tv = chronoToTimeval(std::chrono::system_clock::now());
     pcpp::RawPacket rawPacket((uint8_t*)rawData.data(), rawData.size(), 
                              tv, false);

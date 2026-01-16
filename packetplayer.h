@@ -11,12 +11,11 @@
 #include <QComboBox>
 #include <QThread>
 
-// Включения PcapPlusPlus
 #include "pcapplusplus/PcapFileDevice.h"
 #include "pcapplusplus/PcapLiveDevice.h"
-#include "pcapplusplus/PcapLiveDeviceList.h"  // ДОБАВИТЬ эту строку!
-#include "pcapplusplus/UdpLayer.h"            // ДОБАВИТЬ эту строку!
-#include "pcapplusplus/Packet.h"              // ДОБАВИТЬ эту строку!
+#include "pcapplusplus/PcapLiveDeviceList.h"  
+#include "pcapplusplus/UdpLayer.h"            
+#include "pcapplusplus/Packet.h"              
 
 #include <chrono>
 

@@ -36,11 +36,12 @@ class CaptureThread : public QThread
     
 public:
     CaptureThread(pcpp::PcapLiveDevice* dev, const std::string& filter, 
-                  std::atomic<bool>& stopFlag, QObject* parent = nullptr);
+                  std::atomic<bool>& stopFlag, bool isProm, QObject* parent = nullptr);
     
-    // Статические методы для форматирования пакетов
+    // форматирование пакетов
     static QString formatPacketSummary(pcpp::Packet* packet);
     static QString formatPacketDetails(pcpp::Packet* packet);
+    bool isPromiscuous = true;
     
 signals:
     void packetCaptured(const QString& summary, const QString& details, 
@@ -49,7 +50,7 @@ signals:
     
 protected:
     void run() override;
-    
+
 private:
     pcpp::PcapLiveDevice* device;
     std::string filter;
@@ -81,7 +82,7 @@ private:
     QString formatPacketDetails(pcpp::Packet* packet);
     QString formatPacketSummary(pcpp::Packet* packet);
     
-    // UI Elements
+    // UI
     QComboBox *interfaceCombo;
     QLineEdit *filterEdit;
     QCheckBox *promiscuousCheck;
@@ -92,7 +93,7 @@ private:
     QTextEdit *detailText;
     QLabel *statusLabel;
     
-    // Capture data
+    //  Данные захвата
     std::vector<std::vector<uint8_t>> capturedPackets;
     pcpp::PcapLiveDevice* selectedDevice;
     CaptureThread* captureThread;

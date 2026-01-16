@@ -6,10 +6,7 @@
 #include <QMessageBox>
 #include <QDateTime>
 
-// Добавьте эти включения
-#include <sys/time.h>  // для timeval
-
-// Уже включены в заголовочном файле
+#include <sys/time.h>
 
 PlaybackThread::PlaybackThread(const QString& filename, const QString& interface, 
                                int interval, QObject* parent)
@@ -19,7 +16,6 @@ PlaybackThread::PlaybackThread(const QString& filename, const QString& interface
 
 void PlaybackThread::run()
 {
-    // Open PCAP file
     pcpp::PcapFileReaderDevice reader(filename.toStdString());
     
     if (!reader.open())
@@ -28,8 +24,6 @@ void PlaybackThread::run()
         return;
     }
     
-    // Get output interface
-    // ФИКС: Используем getDeviceByName вместо getPcapLiveDeviceByName
     pcpp::PcapLiveDevice* outputDev = pcpp::PcapLiveDeviceList::getInstance().getDeviceByName(interface.toStdString());
     
     if (!outputDev)
@@ -39,7 +33,6 @@ void PlaybackThread::run()
         return;
     }
     
-    // ФИКС: Настройка устройства
     pcpp::PcapLiveDevice::DeviceConfiguration config;
     config.mode = pcpp::PcapLiveDevice::Promiscuous;
     
@@ -60,8 +53,6 @@ void PlaybackThread::run()
         if (isInterruptionRequested())
             break;
         
-        // Send packet
-        // ФИКС: Передаем rawPacket по ссылке, а не по указателю
         if (outputDev->sendPacket(rawPacket))
         {
             packetCount++;
@@ -87,7 +78,6 @@ void PlaybackThread::run()
             
             emit packetSent(packetInfo);
             
-            // Delay between packets
             if (interval > 0)
                 msleep(interval);
         }
@@ -124,7 +114,6 @@ void PacketPlayer::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     
-    // File selection
     QHBoxLayout *fileLayout = new QHBoxLayout();
     
     QLabel *fileLabel = new QLabel("PCAP File:", this);
@@ -135,7 +124,6 @@ void PacketPlayer::setupUI()
     fileLayout->addWidget(fileEdit, 1);
     fileLayout->addWidget(browseButton);
     
-    // Playback controls
     QFormLayout *controlLayout = new QFormLayout();
     
     QLabel *interfaceLabel = new QLabel("Interface:", this);
@@ -160,12 +148,10 @@ void PacketPlayer::setupUI()
     controlLayout->addRow(intervalLabel, intervalSpin);
     controlLayout->addRow("", buttonLayout);
     
-    // Log text
     logText = new QTextEdit(this);
     logText->setReadOnly(true);
     logText->setFont(QFont("Courier New", 9));
     
-    // Status label
     statusLabel = new QLabel("Ready", this);
     
     mainLayout->addLayout(fileLayout);
@@ -173,7 +159,6 @@ void PacketPlayer::setupUI()
     mainLayout->addWidget(logText, 1);
     mainLayout->addWidget(statusLabel);
     
-    // Connect signals
     connect(browseButton, &QPushButton::clicked, this, &PacketPlayer::browseFile);
     connect(playButton, &QPushButton::clicked, this, &PacketPlayer::startPlayback);
     connect(stopButton, &QPushButton::clicked, this, &PacketPlayer::stopPlayback);
@@ -181,7 +166,6 @@ void PacketPlayer::setupUI()
 
 void PacketPlayer::populateInterfaces()
 {
-    // ФИКС: Добавляем const как в packetcapture.cpp
     const std::vector<pcpp::PcapLiveDevice*>& devList = pcpp::PcapLiveDeviceList::getInstance().getPcapLiveDevicesList();
     
     for (auto& dev : devList)

@@ -5,13 +5,18 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QDateTime>
+#include <QTime>
 #include <QDebug>
 #include <sys/time.h>
 #include <pcapplusplus/Packet.h>
 #include <pcapplusplus/UdpLayer.h>
+#include <pcapplusplus/PcapFileDevice.h>
+#include <pcapplusplus/PcapLiveDevice.h>
 
-PlaybackThread::PlaybackThread(const QString& filename, const QString& interface, bool useTimestamps, int interval, QObject* parent)
-    : QThread(parent), filename(filename), interface(interface), useTimestamps(useTimestamps), interval(interval)
+PlaybackThread::PlaybackThread(const QString& filename, const QString& interface, 
+                               bool useTimestamps, int interval, QObject* parent)
+    : QThread(parent), filename(filename), interface(interface), 
+      useTimestamps(useTimestamps), interval(interval)
 {
 }
 
@@ -50,19 +55,47 @@ void PlaybackThread::run()
     int packetCount = 0;
     timespec prevTimestamp = {0, 0};
     bool firstPacket = true;
-    double totalDelay = 0.0;
+    
     while (reader.getNextPacket(rawPacket))
     {
-        timespec currTimestamp = rawPacket.getPacketTimeStamp();
-        if(!firstPacket){
-            double deltaSeconds = currTimestamp.tv_sec - prevTimestamp.tv_sec;
-            double deltaNanos = currTimestamp.tv_nsec - prevTimestamp.tv_nsec;
-
-            totalDelay = deltaSeconds+(deltaNanos / 1e9);
-        }
         if (isInterruptionRequested())
             break;
         
+        timespec currTimestamp = rawPacket.getPacketTimeStamp();
+        
+        // Вычисляем и применяем задержку ПЕРЕД отправкой пакета
+        if (!firstPacket)
+        {
+            if (useTimestamps)
+            {
+                qDebug()<<"Using timestamps for delay calculation";
+                qDebug() << "Current Timestamp: " << currTimestamp.tv_sec << "s       " << currTimestamp.tv_nsec << "ns";
+                // Вычисляем разницу во времени между пакетами
+                double deltaSeconds = currTimestamp.tv_sec - prevTimestamp.tv_sec;
+                double deltaNanos = currTimestamp.tv_nsec - prevTimestamp.tv_nsec;
+                double totalDelay = deltaSeconds + (deltaNanos / 1e9);
+                qDebug() << "curr:" << currTimestamp.tv_sec << "prev" << prevTimestamp.tv_sec;
+                qDebug() << "curr:" << currTimestamp.tv_nsec << "prev" << prevTimestamp.tv_nsec;
+                qDebug() << "" << deltaSeconds << "     " << deltaNanos;
+                qDebug() << "Delaying for" << totalDelay << "seconds";
+                // Преобразуем секунды в миллисекунды
+                double delayMs = totalDelay * 1000;
+                qDebug() << "Delaying for" << delayMs << "milliseconds";
+                
+                if (delayMs > 0)
+                {
+                    msleep(delayMs);
+                }
+            }
+            else if (interval >= 0)
+            {
+                qDebug() << "Delaying for" << interval << "m/seconds";
+                msleep(interval);
+                 
+            }
+        }
+        
+        // Отправляем пакет
         if (outputDev->sendPacket(rawPacket))
         {
             packetCount++;
@@ -87,20 +120,15 @@ void PlaybackThread::run()
             }
             
             emit packetSent(packetInfo);
-            if(useTimestamps){
-                qDebug() << "Guga";
-                msleep(totalDelay);
-            }
-            else if (interval > 0)
-                qDebug() << "Lala";
-                msleep(interval);
-            prevTimestamp = currTimestamp;
-            firstPacket = false;
         }
         else
         {
             emit playbackError(QString("Failed to send packet %1").arg(packetCount));
         }
+        
+        // Сохраняем временную метку для следующего пакета
+        prevTimestamp = currTimestamp;
+        firstPacket = false;
     }
     
     outputDev->close();

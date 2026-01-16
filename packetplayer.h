@@ -23,6 +23,7 @@ public:
                    bool useTimestamps, 
                    int interval, 
                    QObject* parent = nullptr);
+    
 
 signals:
     void playbackStatus(const QString& status);

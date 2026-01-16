@@ -10,21 +10,11 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt5 COMPONENTS Core Gui Widgets Network REQUIRED)
 
 set(PCAPPP_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/libs/include")
-set(PCAPPP_LIB_DIR "${PROJECT_SOURCE_DIR}/libs/lib")
+set(PCAPPP_LIB_DIR "${PROJECT_SOURCE_DIR}/libs/lib/pcapplusplus")
+set(PCAP_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/libs/include")
+set(PCAP_LIB_DIR "${PROJECT_SOURCE_DIR}/libs/lib/pcap")
 
-    # 2.2 ПРЯМАЯ ПРОВЕРКА СУЩЕСТВОВАНИЯ ФАЙЛОВ (без вызова brew)
-    # Ищем заголовочный файл (например, PcapLiveDevice.h внутри подкаталога)
-find_path(PCAPPP_INCLUDE_SEARCH_PATH
-    NAMES pcapplusplus/PcapLiveDevice.h
-    PATHS "${PCAPPP_INCLUDE_DIR}"
-    NO_DEFAULT_PATH
-)
-   # Ищем хотя бы одну ключевую библиотеку
-find_library(PCAPPP_LIB_PCAP
-    NAMES Pcap++ libPcap++
-    PATHS "${PCAPPP_LIB_DIR}"
-    NO_DEFAULT_PATH
-)
+
 add_library(PcapPlusPlus::PcapPlusPlus INTERFACE IMPORTED GLOBAL)
 target_include_directories(PcapPlusPlus::PcapPlusPlus INTERFACE ${PCAPPP_INCLUDE_DIR})
 
@@ -32,7 +22,7 @@ target_link_libraries(PcapPlusPlus::PcapPlusPlus INTERFACE
     ${PCAPPP_LIB_DIR}/libPcap++.a
     ${PCAPPP_LIB_DIR}/libPacket++.a
     ${PCAPPP_LIB_DIR}/libCommon++.a
-    pcap    
+    ${PCAP_LIB_DIR}/libpcap.a  
     pthread 
     dl      
     m       
